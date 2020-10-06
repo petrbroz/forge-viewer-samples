@@ -1,4 +1,5 @@
 const express = require('express');
+const { AuthenticationClient } = require('forge-server-utils');
 
 const { FORGE_CLIENT_ID, FORGE_CLIENT_SECRET, PORT } = process.env;
 
