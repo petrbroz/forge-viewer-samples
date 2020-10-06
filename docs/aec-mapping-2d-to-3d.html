@@ -1,0 +1,114 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/style.css" type="text/css">
+    <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.*/viewer3D.js"></script>
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+        }
+
+        #preview2d,
+        #preview3d {
+            position: absolute;
+            height: 100%;
+            width: 50%;
+            z-index: 0;
+        }
+
+        #preview2d {
+            left: 0;
+        }
+
+        #preview3d {
+            right: 0;
+        }
+    </style>
+    <title>Autodesk Forge: AEC - Mapping 2D to 3D</title>
+</head>
+
+<body>
+    <div id="preview2d"></div>
+    <div id="preview3d"></div>
+    <script>
+        const MODEL_URN = 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6cGV0cmJyb3otc2FtcGxlcy9yYWNfYmFzaWNfc2FtcGxlX3Byb2plY3RfMjAyMC5ydnQ';
+        const MODEL_2D_VIEWABLE_GUID = '6d3acd40-53b7-41b4-9d96-72e9eaf4bc89-0005d699';
+        const MODEL_3D_VIEWABLE_GUID = '250a6ce5-ee70-fdca-bfc9-4111f54e9baa';
+
+        const options = {
+            getAccessToken: async function (callback) {
+                const resp = await fetch('/api/auth/token');
+                if (resp.ok) {
+                    const token = await resp.json();
+                    callback(token.access_token, token.expires_in);
+                } else {
+                    throw new Error(await resp.text());
+                }
+            }
+        };
+
+        Autodesk.Viewing.Initializer(options, function () {
+            const config = {
+                extensions: ['Autodesk.AEC.LevelsExtension']
+            };
+            const viewer2D = new Autodesk.Viewing.GuiViewer3D(document.getElementById('preview2d'), config);
+            viewer2D.start();
+            loadModel(viewer2D, MODEL_URN, MODEL_2D_VIEWABLE_GUID);
+            const viewer3D = new Autodesk.Viewing.GuiViewer3D(document.getElementById('preview3d'), config);
+            viewer3D.start();
+            loadModel(viewer3D, MODEL_URN, MODEL_3D_VIEWABLE_GUID);
+
+            viewer3D.overlays.addScene('indicator-scene');
+            let geometry = new THREE.SphereGeometry(1, 8, 8);
+            let material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
+            viewer2D.container.addEventListener('click', function (ev) {
+                const intersection = viewer2D.hitTest(ev.clientX, ev.clientY);
+                viewer3D.isolate([]);
+                if (intersection) {
+                    viewer3D.isolate(intersection.dbId);
+                    const worldPos = sheetToWorld(intersection.intersectPoint, viewer2D.model, viewer3D.model);
+                    if (worldPos) {
+                        let mesh = new THREE.Mesh(geometry, material);
+                        mesh.position.set(worldPos.x, worldPos.y, worldPos.z);
+                        viewer3D.overlays.addMesh(mesh, 'indicator-scene');
+                    }
+                }
+            });
+        });
+
+        async function loadModel(viewer, urn, guid) {
+            return new Promise(function (resolve, reject) {
+                function onDocumentLoadSuccess(doc) {
+                    Autodesk.Viewing.Document.getAecModelData(doc.getRoot()).then(aec => console.log('AEC metadata', aec));
+                    resolve(viewer.loadDocumentNode(doc, doc.getRoot().findByGuid(guid)));
+                }
+                function onDocumentLoadFailure(code, message) {
+                    console.error('Could not load document.', message);
+                    reject(message);
+                }
+                Autodesk.Viewing.Document.load('urn:' + urn, onDocumentLoadSuccess, onDocumentLoadFailure);
+            });
+        }
+
+        function sheetToWorld(sheetPos, model2d, model3d) {
+            const viewport = Autodesk.AEC.AecModelData.findViewportAtPoint(model2d, new THREE.Vector2(sheetPos.x, sheetPos.y));
+            if (!viewport) {
+                return null;
+            }
+            const sheetUnitScale = model2d.getUnitScale();
+            const globalOffset = model3d.getData().globalOffset;
+            const matrix = Autodesk.AEC.AecModelData.get2DTo3DMatrix(viewport, sheetUnitScale);
+            const worldPos = sheetPos.clone().applyMatrix4(matrix).sub(globalOffset);
+            return worldPos;
+        }
+    </script>
+</body>
+
+</html>
