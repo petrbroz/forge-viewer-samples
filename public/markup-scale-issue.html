@@ -1,0 +1,98 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="X-UA-Compatible" content="ie=edge">
+    <link rel="stylesheet" href="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.28/style.css" type="text/css">
+    <style>
+        body,
+        html {
+            margin: 0;
+            padding: 0;
+            height: 100vh;
+        }
+
+        #preview {
+            height: 100%;
+            z-index: 0;
+        }
+
+        #overlay {
+            position: absolute;
+            top: 1em;
+            right: 1em;
+            z-index: 1;
+        }
+    </style>
+    <script src="https://developer.api.autodesk.com/modelderivative/v2/viewers/7.28/viewer3D.js"></script>
+    <title>Autodesk Forge: Markup Scale Issue</title>
+</head>
+
+<body>
+    <div id="preview"></div>
+    <div id="overlay">
+        <button id="load-drawing-1">Load DWG #1</button>
+        <button id="load-drawing-2">Load DWG #2</button>
+        <button id="load-revit-sheet-1">Load RVT Sheet #1</button>
+        <button id="load-revit-sheet-2">Load RVT Sheet #2</button>
+    </div>
+    <script>
+        window.addEventListener('DOMContentLoaded', async function () {
+            const viewer = await initViewer();
+            document.getElementById('load-drawing-1').addEventListener('click', function () {
+                loadModel(viewer, 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6cGV0cmJyb3otZGF0YXNhbXBsZXMvdHJvbGxleV9zdHJ1Y3R1cmUuZHdn');
+            });
+            document.getElementById('load-drawing-2').addEventListener('click', function () {
+                loadModel(viewer, 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6cGV0cmJyb3otZGF0YXNhbXBsZXMvd2hlZWxfY2FzaW5nLmR3Zw');
+            });
+            document.getElementById('load-revit-sheet-1').addEventListener('click', function () {
+                loadModel(viewer, 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6cGV0cmJyb3otZGF0YXNhbXBsZXMvcmFjX2Jhc2ljX3NhbXBsZV9wcm9qZWN0LnJ2dA', '6d3acd40-53b7-41b4-9d96-72e9eaf4bc89-0005d699');
+            });
+            document.getElementById('load-revit-sheet-2').addEventListener('click', function () {
+                loadModel(viewer, 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6cGV0cmJyb3otZGF0YXNhbXBsZXMvcmFjX2Jhc2ljX3NhbXBsZV9wcm9qZWN0LnJ2dA', '96cdd175-e436-4cac-a08f-bf0fabb86ac5-0007af95');
+            });
+        });
+
+        async function initViewer() {
+            const options = {
+                getAccessToken: async function (callback) {
+                    const resp = await fetch('/api/auth/token');
+                    if (resp.ok) {
+                        const token = await resp.json();
+                        callback(token.access_token, token.expires_in);
+                    } else {
+                        throw new Error(await resp.text());
+                    }
+                }
+            };
+            return new Promise(function (resolve, reject) {
+                Autodesk.Viewing.Initializer(options, function () {
+                    const config = {
+                        extensions: ['Autodesk.Viewing.MarkupsCore', 'Autodesk.Viewing.MarkupsGui']
+                    };
+                    const viewer = new Autodesk.Viewing.GuiViewer3D(document.getElementById('preview'), config);
+                    viewer.start();
+                    resolve(viewer);
+                });
+            });
+        }
+
+        async function loadModel(viewer, urn, guid) {
+            return new Promise(function (resolve, reject) {
+                function onDocumentLoadSuccess(doc) {
+                    viewer.loadDocumentNode(doc, guid ? doc.getRoot().findByGuid(guid) : doc.getRoot().getDefaultGeometry());
+                    resolve();
+                }
+                function onDocumentLoadFailure(code, message) {
+                    console.error('Could not load document.', message);
+                    reject(message);
+                }
+                Autodesk.Viewing.Document.load('urn:' + urn, onDocumentLoadSuccess, onDocumentLoadFailure);
+            });
+        }
+    </script>
+</body>
+
+</html>
