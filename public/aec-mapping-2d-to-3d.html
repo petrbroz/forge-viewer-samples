@@ -41,6 +41,7 @@
         const MODEL_URN = 'dXJuOmFkc2sub2JqZWN0czpvcy5vYmplY3Q6cGV0cmJyb3otc2FtcGxlcy9yYWNfYmFzaWNfc2FtcGxlX3Byb2plY3RfMjAyMC5ydnQ';
         const MODEL_2D_VIEWABLE_GUID = '6d3acd40-53b7-41b4-9d96-72e9eaf4bc89-0005d699';
         const MODEL_3D_VIEWABLE_GUID = '250a6ce5-ee70-fdca-bfc9-4111f54e9baa';
+        let viewer2D, viewer3D;
 
         const options = {
             getAccessToken: async function (callback) {
@@ -56,12 +57,12 @@
 
         Autodesk.Viewing.Initializer(options, function () {
             const config = {
-                extensions: ['Autodesk.AEC.LevelsExtension']
+                extensions: ['Autodesk.AEC.LevelsExtension', 'Autodesk.AEC.ViewportsExtension']
             };
-            const viewer2D = new Autodesk.Viewing.GuiViewer3D(document.getElementById('preview2d'), config);
+            viewer2D = new Autodesk.Viewing.GuiViewer3D(document.getElementById('preview2d'), config);
             viewer2D.start();
             loadModel(viewer2D, MODEL_URN, MODEL_2D_VIEWABLE_GUID);
-            const viewer3D = new Autodesk.Viewing.GuiViewer3D(document.getElementById('preview3d'), config);
+            viewer3D = new Autodesk.Viewing.GuiViewer3D(document.getElementById('preview3d'), config);
             viewer3D.start();
             loadModel(viewer3D, MODEL_URN, MODEL_3D_VIEWABLE_GUID);
 
@@ -98,13 +99,14 @@
         }
 
         function sheetToWorld(sheetPos, model2d, model3d) {
-            const viewport = Autodesk.AEC.AecModelData.findViewportAtPoint(model2d, new THREE.Vector2(sheetPos.x, sheetPos.y));
+            const viewportExt = viewer2D.getExtension('Autodesk.AEC.ViewportsExtension');
+            const viewport = viewportExt.findViewportAtPoint(model2d, new THREE.Vector2(sheetPos.x, sheetPos.y));
             if (!viewport) {
                 return null;
             }
             const sheetUnitScale = model2d.getUnitScale();
             const globalOffset = model3d.getData().globalOffset;
-            const matrix = Autodesk.AEC.AecModelData.get2DTo3DMatrix(viewport, sheetUnitScale);
+            const matrix = viewport.get2DTo3DMatrix(sheetUnitScale);
             const worldPos = sheetPos.clone().applyMatrix4(matrix).sub(globalOffset);
             return worldPos;
         }
