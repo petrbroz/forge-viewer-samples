@@ -67,6 +67,7 @@
             loadModel(viewer3D, MODEL_URN, MODEL_3D_VIEWABLE_GUID);
 
             viewer3D.overlays.addScene('indicator-scene');
+            viewer2D.overlays.addScene('indicator-scene');
             let geometry = new THREE.SphereGeometry(1, 8, 8);
             let material = new THREE.MeshBasicMaterial({ color: 0xff0000 });
             viewer2D.container.addEventListener('click', function (ev) {
@@ -79,6 +80,26 @@
                         let mesh = new THREE.Mesh(geometry, material);
                         mesh.position.set(worldPos.x, worldPos.y, worldPos.z);
                         viewer3D.overlays.addMesh(mesh, 'indicator-scene');
+                    }
+                }
+            });
+
+            viewer3D.container.addEventListener('click', function (ev) {
+                let rect = viewer3D.impl.canvas.getBoundingClientRect();
+                let width = rect.width;
+                let height = rect.height;
+
+                let canvasX = ev.clientX - rect.left;
+                let canvasY = ev.clientY - rect.top;
+
+                const intersection = viewer3D.impl.hitTest(canvasX, canvasY);
+                viewer2D.isolate([]);
+                if (intersection) {
+                    const sheetPos = worldToSheet(intersection.intersectPoint, viewer2D.model, viewer3D.model);
+                    if (sheetPos) {
+                        let mesh = new THREE.Mesh(geometry, material);
+                        mesh.position.set(sheetPos.x, sheetPos.y, sheetPos.z);
+                        viewer2D.overlays.addMesh(mesh, 'indicator-scene');
                     }
                 }
             });
@@ -109,6 +130,23 @@
             const matrix = viewport.get2DTo3DMatrix(sheetUnitScale);
             const worldPos = sheetPos.clone().applyMatrix4(matrix).sub(globalOffset);
             return worldPos;
+        }
+
+        function worldToSheet(modelPos, model2d, model3d) {
+            const viewportExt = viewer2D.getExtension('Autodesk.AEC.ViewportsExtension');
+            const viewports = Autodesk.AEC.AecModelData.findViewportsOnSheet(model2d);
+            if (!viewports || viewports.length <= 0) {
+                return null;
+            }
+
+            const viewport = Array.isArray(viewports) ? viewports[0] : viewports;
+            const sheetUnitScale = model2d.getUnitScale();
+            const globalOffset = model3d.getData().globalOffset;
+            const sheetMatrix = Autodesk.AEC.AecModelData.get3DTo2DMatrix(viewport, sheetUnitScale).clone();
+            sheetMatrix.multiply(viewer3D.model.getInverseModelToViewerTransform());
+
+            const sheetPos = modelPos.clone().applyMatrix4(sheetMatrix);
+            return sheetPos;
         }
     </script>
 </body>
